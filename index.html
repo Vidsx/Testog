@@ -390,6 +390,46 @@
     .toolbar { flex-direction: column; align-items: flex-start; }
   }
 
+  /* ── Download btn ── */
+  .btn-download {
+    background: rgba(52,211,153,.1);
+    color: var(--green);
+    border: 1px solid rgba(52,211,153,.25);
+    font-size: 12px;
+    padding: 7px 13px;
+  }
+  .btn-download:hover { background: rgba(52,211,153,.18); }
+
+  /* ── Upload guide box ── */
+  .guide-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.7;
+    display: none;
+  }
+  .guide-box.show { display: block; }
+  .guide-box strong { color: var(--accent2); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .guide-box .step {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 6px;
+  }
+  .guide-box .step:last-child { margin-bottom: 0; }
+  .step-num {
+    min-width: 20px; height: 20px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+  }
+
   /* ── OG Preview chip ── */
   .og-chip {
     display: inline-flex; align-items: center; gap: 4px;
@@ -493,6 +533,17 @@
       <button class="btn btn-primary" id="addBtn" onclick="addLink()">
         🔗 Create Link
       </button>
+    </div>
+  </div>
+
+  <!-- GitHub Upload Guide -->
+  <div class="card" id="guideCard" style="animation-delay:.06s;display:none">
+    <div class="card-title"><div class="dot" style="background:var(--green);box-shadow:0 0 8px var(--green)"></div> GitHub-এ Upload করার নিয়ম</div>
+    <div class="guide-box show">
+      <div class="step"><div class="step-num">1</div><div>লিংক তৈরি করার পর <strong>⬇ Download Redirect File</strong> বাটনে ক্লিক করো — একটা <strong>.html</strong> ফাইল ডাউনলোড হবে।</div></div>
+      <div class="step"><div class="step-num">2</div><div>GitHub-এ তোমার repo-তে যাও। <strong>go → [slug]</strong> ফোল্ডার তৈরি করো। যেমন: <strong>go/24e8ry7/</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div>ডাউনলোড করা ফাইলটার নাম <strong>index.html</strong> রেখে ওই ফোল্ডারে আপলোড করো।</div></div>
+      <div class="step"><div class="step-num">4</div><div>এখন <strong>yourdomain.github.io/go/[slug]</strong> লিংকটা কাজ করবে ✅</div></div>
     </div>
   </div>
 
@@ -613,6 +664,7 @@ function addLink() {
 
   renderTable();
   updateStats();
+  maybeShowGuide();
 }
 
 // ── Delete ──
@@ -622,6 +674,7 @@ function deleteLink(id) {
   save(links);
   renderTable();
   updateStats();
+  maybeShowGuide();
 }
 
 // ── Toggle Edit ──
@@ -670,7 +723,74 @@ function simulateClick(id) {
   updateStats();
 }
 
-// ── Export JSON ──
+// ── Download Redirect HTML for GitHub ──
+function downloadRedirect(id) {
+  const links = load();
+  const l = links.find(x => x.id === id);
+  if (!l) return;
+
+  const title   = l.title  || 'Redirecting…';
+  const desc    = l.desc   || '';
+  const img     = l.img    || '';
+  const target  = l.target;
+  const slug    = l.slug;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${title.replace(/</g,'&lt;')}</title>
+<!-- Open Graph -->
+<meta property="og:type"        content="website">
+<meta property="og:title"       content="${title.replace(/"/g,'&quot;')}">
+<meta property="og:description" content="${desc.replace(/"/g,'&quot;')}">
+${img ? `<meta property="og:image"       content="${img.replace(/"/g,'&quot;')}">` : ''}
+<!-- Twitter Card -->
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="${title.replace(/"/g,'&quot;')}">
+<meta name="twitter:description" content="${desc.replace(/"/g,'&quot;')}">
+${img ? `<meta name="twitter:image"       content="${img.replace(/"/g,'&quot;')}">` : ''}
+<!-- Redirect -->
+<meta http-equiv="refresh" content="0;url=${target.replace(/"/g,'&quot;')}">
+<link rel="canonical" href="${target.replace(/"/g,'&quot;')}">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#0a0a0f;display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui,sans-serif}
+  .wrap{text-align:center;color:#e8e8f0}
+  .ring{width:44px;height:44px;border:3px solid #2a2a35;border-top-color:#7c6dfa;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  p{color:#5a5a72;font-size:14px}
+  a{color:#a78bfa;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ring"></div>
+  <p>Redirecting… <a href="${target.replace(/"/g,'&quot;')}">Click here</a> if not redirected.</p>
+</div>
+<script>setTimeout(function(){window.location.replace("${target.replace(/\\/g,'\\\\').replace(/"/g,'\\"')}");},300);<\/script>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = slug + '-redirect.html';
+  a.click();
+
+  toast('Downloaded! Rename to index.html → upload to /go/' + slug + '/');
+}
+
+// ── Show guide card ──
+function maybeShowGuide() {
+  const links = load();
+  const card = document.getElementById('guideCard');
+  if (card) card.style.display = links.length > 0 ? 'block' : 'none';
+}
+
+
 function exportJSON() {
   const data = load();
   if (!data.length) { toast('No links to export.'); return; }
@@ -743,6 +863,7 @@ function renderTable() {
       <td>
         <div class="actions">
           <button class="btn-icon" onclick="copyLink('${esc(l.slug)}',this)" title="Copy cloaked URL">📋</button>
+          <button class="btn btn-download" onclick="downloadRedirect(${l.id})" title="Download redirect HTML for GitHub">⬇ GitHub File</button>
           <button class="btn-icon" onclick="toggleEdit(${l.id})" title="Edit">✏️</button>
           <button class="btn-icon" onclick="simulateClick(${l.id})" title="Add click (+1)">👆</button>
           <button class="btn btn-danger" onclick="deleteLink(${l.id})">🗑</button>
@@ -791,6 +912,7 @@ document.addEventListener('keydown', e => {
 // ── Init ──
 renderTable();
 updateStats();
+maybeShowGuide();
 </script>
 </body>
 </html>
